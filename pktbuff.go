@@ -13,12 +13,12 @@ type pktbuff struct {
 }
 
 func allocPktbuff() *pktbuff {
-	b := make([]byte, 2048)
-	return &pktbuff{
+	pkt := pktbuff{
 		addr: nil,
 		size: 0,
-		buff: b,
+		buff: make([]byte, 2048),
 	}
+	return &pkt
 }
 
 func (p *pktbuff) head(n int) []byte {

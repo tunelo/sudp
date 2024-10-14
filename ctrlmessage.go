@@ -30,7 +30,6 @@ func ctrlmessageLoad(b []byte, v *ecdsa.PublicKey) (*ctrlmessage, error) {
 	c := ctrlmessage{}
 	copy(c.signature[:], b[16:16+64])
 	if ok := verifySignature(v, b[0:16], c.signature); !ok {
-		fmt.Println(b)
 		return nil, fmt.Errorf("invalid signature")
 	}
 	c.crc32 = binary.BigEndian.Uint32(b[0:4])

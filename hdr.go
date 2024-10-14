@@ -24,7 +24,7 @@ type hdr struct {
 }
 
 func newHdr(kind uint8, epoch uint32, src, dst uint16) *hdr {
-	return &hdr{
+	h := hdr{
 		ver:   protocolVersion,
 		kind:  kind,
 		epoch: epoch,
@@ -32,6 +32,7 @@ func newHdr(kind uint8, epoch uint32, src, dst uint16) *hdr {
 		dst:   dst,
 		time:  uint64(time.Now().UnixMilli()),
 	}
+	return &h
 }
 
 func hdrLoad(b []byte) (*hdr, error) {

@@ -2,7 +2,6 @@ package sudp
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"net"
 	"time"
 )
@@ -93,7 +92,7 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 		if e := h.dump(packet.tail(hdrsz)); e != nil {
 			return newError("serializing hdr", e)
 		}
-		ctrl := &ctrlmessage{}
+		ctrl := ctrlmessage{}
 		ctrl.crc32 = h.crc32
 		ctrl.set(EpochAck)
 		if e := ctrl.dump(packet.tail(ctrlmessagesz), private); e != nil {
@@ -104,8 +103,6 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 	case typeCtrlMessage:
 		c, e := ctrlmessageLoad(pkt.head(int(hdr.len)), p.pubkey)
 		if e != nil || hdr.crc32 != c.crc32 {
-			fmt.Println(hdr.String())
-			fmt.Println(pkt)
 			return newError("at ctrl message", e)
 		}
 		if c.isSet(EpochAck) {
@@ -129,7 +126,7 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 			if e := header.dump(packet.tail(hdrsz)); e != nil {
 				return newError("serializing hdr", e)
 			}
-			ctrl := &ctrlmessage{}
+			ctrl := ctrlmessage{}
 			ctrl.crc32 = header.crc32
 			ctrl.set(KeepAliveAck)
 			if e := ctrl.dump(packet.tail(ctrlmessagesz), private); e != nil {
@@ -177,7 +174,7 @@ func (p *peer) sendDataPacket(src uint16, buff []byte, conn *net.UDPConn) error 
 	if e := hdr.dump(packet.tail(hdrsz)); e != nil {
 		return newError("hdr dump", e)
 	}
-	data := &data{}
+	data := data{}
 	data.crc32 = hdr.crc32
 	data.buff = buff
 	if e := data.dump(key, packet.tail(int(hdr.len))); e != nil {

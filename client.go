@@ -71,6 +71,7 @@ func (c *ClientConn) serve() error {
 				}
 			case <-control.C:
 				if c.server.ready {
+					var ctrl ctrlmessage
 					epoch, _ := c.server.epochs.current()
 					header := newHdr(typeCtrlMessage, uint32(epoch), c.vaddr, c.server.vaddr)
 					header.len = ctrlmessagesz
@@ -79,9 +80,7 @@ func (c *ClientConn) serve() error {
 					if err := header.dump(packet.tail(hdrsz)); err != nil {
 						continue
 					}
-					ctrl := ctrlmessage{
-						crc32: header.crc32,
-					}
+					ctrl.crc32 = header.crc32
 					ctrl.set(KeepAlive)
 					if err := ctrl.dump(packet.tail(ctrlmessagesz), c.private); err != nil {
 						continue

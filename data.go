@@ -46,8 +46,9 @@ func loadData(b []byte, cipher *dhss) (*data, error) {
 	if e != nil {
 		return nil, e
 	}
-	return &data{
+	data := data{
 		crc32: binary.BigEndian.Uint32(d[0:4]),
 		buff:  d[4:],
-	}, nil
+	}
+	return &data, nil
 }
