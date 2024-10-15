@@ -44,19 +44,22 @@ func (c *ClientConn) serve() error {
 		control := time.NewTicker(500 * time.Millisecond)
 		for {
 			select {
+			case <-c.ch.exit:
+				goto exit
 			case msg := <-c.ch.userTx:
 				if c.server == nil || c.server.vaddr != msg.addr || !c.server.ready {
-					c.ch.errTx <- newError("not ready", nil)
+					c.ch.errUTx <- newError("not ready", nil)
 					continue
 				}
 				e := c.server.sendDataPacket(c.vaddr, msg.buff, c.conn)
 				if e != nil {
-					c.ch.errTx <- newError("sending data packet:", e)
+					c.ch.errUTx <- newError("sending data packet:", e)
 					continue
 				}
-				c.ch.errTx <- nil
+				c.ch.errUTx <- nil
 			case pkt := <-c.ch.netRx:
 				if pkt == nil {
+					c.open = false
 					c.err <- fmt.Errorf("unexpected close")
 					return
 				}
@@ -69,6 +72,11 @@ func (c *ClientConn) serve() error {
 				if e != nil {
 					log(Error, fmt.Sprintf("at package handle - %v", e))
 				}
+
+			case e := <-c.ch.errNRx:
+				c.open = false
+				c.err <- fmt.Errorf("at reception %v -> panic", e)
+				return
 			case <-control.C:
 				if c.server.ready {
 					var ctrl ctrlmessage
@@ -133,8 +141,26 @@ func (c *ClientConn) serve() error {
 				c.err <- nil
 			}
 		}
+	exit:
+		c.open = false
+		c.conn.Close()
+		for {
+			select {
+			case _, ok := <-c.ch.netRx:
+				if !ok {
+					c.err <- nil
+					c.ch.close()
+					return
+				}
+			case e, ok := <-c.ch.errNRx:
+				if ok {
+					c.err <- e
+					c.ch.close()
+					return
+				}
+			}
+		}
 	}(start)
-	fmt.Println("Mandando mensaje")
 	start <- time.Time{}
 	return <-c.err
 }
@@ -176,6 +202,7 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr) (*ClientConn, error) {
 		c.ch.close()
 		return nil, e
 	}
+	c.open = true
 	return c, nil
 }
 
@@ -184,7 +211,7 @@ func (s *ClientConn) Send(buff []byte) error {
 		buff: buff,
 		addr: s.server.vaddr,
 	}
-	return <-s.ch.errTx
+	return <-s.ch.errUTx
 }
 
 func (s *ClientConn) Recv() []byte {

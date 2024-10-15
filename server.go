@@ -34,8 +34,11 @@ func (s *ServerConn) filterPacket(pkt *pktbuff) (*hdr, error) {
 func (s *ServerConn) serve() {
 	for {
 		select {
+		case <-s.ch.exit:
+			goto exit
 		case pkt := <-s.ch.netRx:
 			if pkt == nil {
+				s.open = false
 				s.err <- fmt.Errorf("unexpected close")
 				return
 			}
@@ -50,18 +53,22 @@ func (s *ServerConn) serve() {
 			if e != nil {
 				log(Error, fmt.Sprintf("at package handle - %v", e))
 			}
+		case e := <-s.ch.errNRx:
+			s.open = false
+			s.err <- fmt.Errorf("at reception %v -> panic", e)
+			return
 		case msg := <-s.ch.userTx:
 			peer, ok := s.peerMap[msg.addr]
 			if !ok || !peer.ready {
-				s.ch.errTx <- newError("not ready", nil)
+				s.ch.errUTx <- newError("not ready", nil)
 				continue
 			}
 			e := peer.sendDataPacket(s.vaddr, msg.buff, s.conn)
 			if e != nil {
-				s.ch.errTx <- newError("sending data packet:", e)
+				s.ch.errUTx <- newError("sending data packet:", e)
 				continue
 			}
-			s.ch.errTx <- nil
+			s.ch.errUTx <- nil
 		}
 		for _, peer := range s.peerMap {
 			if peer.ready && time.Now().Sub(peer.ttlm) > 5*time.Second {
@@ -70,6 +77,25 @@ func (s *ServerConn) serve() {
 				peer.ready = false
 				peer.tsync = nil
 				peer.ttlm = time.Time{}
+			}
+		}
+	}
+exit:
+	s.open = false
+	s.conn.Close()
+	for {
+		select {
+		case _, ok := <-s.ch.netRx:
+			if !ok {
+				s.err <- nil
+				s.ch.close()
+				return
+			}
+		case e, ok := <-s.ch.errNRx:
+			if ok {
+				s.err <- e
+				s.ch.close()
+				return
 			}
 		}
 	}
@@ -112,7 +138,7 @@ func Listen(laddr *LocalAddr, raddrs []*RemoteAddr) (*ServerConn, error) {
 	}
 
 	server.ch.init(conn, nil)
-
+	server.open = true
 	go server.serve()
 	return &server, nil
 }
@@ -127,5 +153,5 @@ func (s *ServerConn) SendTo(buff []byte, addr uint16) error {
 		buff: buff,
 		addr: addr,
 	}
-	return <-s.ch.errTx
+	return <-s.ch.errUTx
 }

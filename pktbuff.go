@@ -1,6 +1,7 @@
 package sudp
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -74,17 +75,26 @@ func pktRecv(conn *net.UDPConn, from *net.UDPAddr, deadline *time.Time) (*pktbuf
 	return pkt, nil
 }
 
-func ptkRxRoutine(conn *net.UDPConn, addr *net.UDPAddr) chan *pktbuff {
+func ptkRxRoutine(conn *net.UDPConn, addr *net.UDPAddr) (chan *pktbuff, chan error) {
 	io := make(chan *pktbuff)
+	er := make(chan error)
 	go func() {
 		for {
 			p, e := pktRecv(conn, addr, nil)
 			if e != nil {
-				io <- nil
+				if errors.Is(e, net.ErrClosed) {
+					io <- nil
+					close(io)
+					close(er)
+					return
+				}
+				er <- e
+				close(io)
+				close(er)
 				return
 			}
 			io <- p
 		}
 	}()
-	return io
+	return io, er
 }
