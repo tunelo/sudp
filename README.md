@@ -27,7 +27,7 @@ The handshake structure is used during the initial negotiation phase to exchange
 
 | Field     | Type      | Description                          |
 |-----------|-----------|--------------------------------------|
-| crc32     | uint32    | CRC32 of the handshake message       |
+| crc32     | uint32    | CRC32 of the header                  |
 | pubkey    | [65]byte  | DH public key                        |
 | signature | [64]byte  | Digital signature of the message     |
 
@@ -40,7 +40,7 @@ Control messages are used to manage connection state, including `KeepAlive`, `RT
 
 | Field     | Type      | Description                          |
 |-----------|-----------|--------------------------------------|
-| crc32     | uint32    | CRC32 of the control message         |
+| crc32     | uint32    | CRC32 of the header                  |
 | ctrl      | uint32    | Control flags (see below)            |
 | data      | uint64    | Additional data                      |
 | signature | [64]byte  | Digital signature of the message     |
@@ -74,7 +74,7 @@ Data transmitted through SUDP is encrypted using the **AES-GCM** algorithm to en
 
 | Field | Type   | Description              |
 |-------|--------|--------------------------|
-| crc32 | uint32 | CRC32 of the data         |
+| crc32 | uint32 | CRC32 of the header       |
 | buff  | []byte | Encrypted data buffer     |
 
 - **buff:** The body of the message, encrypted using **AES-GCM** for secure transmission.
