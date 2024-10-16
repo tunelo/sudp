@@ -98,14 +98,24 @@ func (c *ClientConn) serve() error {
 				if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > 2*time.Second {
 					tries = tries + 1
 					if tries == 4 {
+						c.open = false
+						c.conn.Close()
+						fmt.Println("estoy fin")
+						e := <-c.ch.netRx
+						fmt.Println(e)
+						for ; e != nil; e = <-c.ch.netRx {
+						}
+						fmt.Println("Pase el for")
+						c.ch.close()
+						fmt.Println("Cierro canal")
 						c.err <- fmt.Errorf("timeout")
+						fmt.Println("Retorno")
 						return
 					}
 					c.server.hsSent = time.Now()
 					c.server.resend.pktSend(c.conn)
 				}
 			case <-refresh:
-				fmt.Println("Refresh ======================================= ")
 				tries = 0
 				if pending, _ := c.server.epochs.pending(); pending != -1 {
 					continue // Evaluar que hacemos aca
@@ -196,17 +206,23 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr) (*ClientConn, error) {
 	c.server.epochs.init()
 
 	if e := c.serve(); e != nil {
-		fmt.Println(e)
-		c.conn.Close()
-		<-c.err
-		c.ch.close()
 		return nil, e
 	}
 	c.open = true
 	return c, nil
 }
 
+func (s *ClientConn) Close() {
+	if s != nil && s.open {
+		s.ch.exit <- true
+		<-s.err
+	}
+}
+
 func (s *ClientConn) Send(buff []byte) error {
+	if s == nil || !s.open {
+		return fmt.Errorf("connection closed")
+	}
 	s.ch.userTx <- &message{
 		buff: buff,
 		addr: s.server.vaddr,
@@ -214,7 +230,10 @@ func (s *ClientConn) Send(buff []byte) error {
 	return <-s.ch.errUTx
 }
 
-func (s *ClientConn) Recv() []byte {
+func (s *ClientConn) Recv() ([]byte, error) {
+	if s == nil || !s.open {
+		return nil, fmt.Errorf("connection closed")
+	}
 	msg := <-s.ch.userRx
-	return msg.buff
+	return msg.buff, nil
 }

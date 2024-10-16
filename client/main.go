@@ -34,9 +34,12 @@ func main() {
 
 	c, e := sudp.Connect(&laddr, &raddr)
 	fmt.Println(c, e)
+	if e != nil {
+		return
+	}
 	for {
-		c.Send([]byte("Puto"))
-		data := c.Recv()
+		c.Send([]byte("Send"))
+		data, _ := c.Recv()
 		fmt.Println(string(data))
 		time.Sleep(time.Second)
 	}

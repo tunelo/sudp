@@ -143,12 +143,25 @@ func Listen(laddr *LocalAddr, raddrs []*RemoteAddr) (*ServerConn, error) {
 	return &server, nil
 }
 
-func (s *ServerConn) RecvFrom() ([]byte, uint16) {
+func (s *ServerConn) Close() {
+	if s != nil && s.open {
+		s.ch.exit <- true
+		<-s.err
+	}
+}
+
+func (s *ServerConn) RecvFrom() ([]byte, uint16, error) {
+	if s == nil || !s.open {
+		return nil, 0, fmt.Errorf("server closed")
+	}
 	msg := <-s.ch.userRx
-	return msg.buff, msg.addr
+	return msg.buff, msg.addr, nil
 }
 
 func (s *ServerConn) SendTo(buff []byte, addr uint16) error {
+	if s == nil || !s.open {
+		return fmt.Errorf("server closed")
+	}
 	s.ch.userTx <- &message{
 		buff: buff,
 		addr: addr,

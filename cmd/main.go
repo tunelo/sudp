@@ -30,9 +30,9 @@ func main() {
 	}
 
 	for {
-		data, from := srv.RecvFrom()
+		data, from, _ := srv.RecvFrom()
 		fmt.Println(fmt.Sprintf("Recibido de %d %s", from, string(data)))
-		srv.SendTo([]byte("Trolo"), from)
+		srv.SendTo([]byte("Recv"), from)
 	}
 	//	server, e := sdtlv2.NewServer("config.json")
 

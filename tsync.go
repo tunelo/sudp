@@ -29,7 +29,6 @@ func newTimeSync(remoteTime uint64) (*timeSync, error) {
 func (ts *timeSync) inTime(msgTimestamp uint64) bool {
 	sent := time.UnixMilli(int64(msgTimestamp)).Add(ts.offset)
 	host := time.Now()
-	fmt.Println(host.UnixMilli())
 	if sent.Before(host.Add(-maxMessageDelay)) { //|| sent.After(host) {
 		return false
 	}
