@@ -2,6 +2,7 @@ package sudp
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"net"
 	"time"
 )
@@ -73,7 +74,7 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 		}
 		// Promote
 		if e := p.epochs.promote(pending); e != nil {
-			return newError("impossible to promote new epoch", e)
+			return newError("impossible to promote new epoch at server handshake", e)
 		}
 		// Enviar ctrlmessage
 
@@ -105,13 +106,11 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 		if e != nil || hdr.crc32 != c.crc32 {
 			return newError("at ctrl message", e)
 		}
-		if c.isSet(EpochAck) {
-			pending, _ := p.epochs.pending()
-			if pending == int(hdr.epoch) {
-				e := p.epochs.promote(pending)
-				if e != nil {
-					return newError("promoting new epoch", e)
-				}
+		if (c.isSet(EpochAck) && p.epochs.isPending(int(hdr.epoch))) || p.epochs.isPending(int(hdr.epoch)) {
+			pending := int(hdr.epoch)
+			e := p.epochs.promote(pending)
+			if e != nil {
+				return newError("promoting new epoch", e)
 			}
 		}
 		p.ttlm = time.Now()
@@ -139,12 +138,20 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 			epoch int
 			key   *dhss
 		)
-		epoch, key = p.epochs.current()
-		if int(hdr.epoch) != epoch {
+
+		// First at all, verify the epoch
+		epoch = int(hdr.epoch)
+		if p.epochs.isCurrent(epoch) {
+			_, key = p.epochs.current()
+		} else if p.epochs.isPending(epoch) {
 			if e := p.epochs.promote(int(hdr.epoch)); e != nil {
-				return newError("invalid epoch", e)
+				return fmt.Errorf("invalid epoch: %v, header: %d", e, int(hdr.epoch))
 			}
-			epoch, key = p.epochs.current()
+			_, key = p.epochs.current()
+		} else if p.epochs.isPrev(epoch) {
+			_, key = p.epochs.prev()
+		} else {
+			return fmt.Errorf("invalid epoch - drop")
 		}
 		data, e := loadData(pkt.head(int(hdr.len)), key)
 		if e != nil || data.crc32 != hdr.crc32 {
