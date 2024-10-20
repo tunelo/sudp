@@ -155,6 +155,9 @@ func (s *ServerConn) RecvFrom() ([]byte, uint16, error) {
 		return nil, 0, fmt.Errorf("server closed")
 	}
 	msg := <-s.ch.userRx
+	if msg == nil {
+		return nil, 0, fmt.Errorf("server closed")
+	}
 	return msg.buff, msg.addr, nil
 }
 

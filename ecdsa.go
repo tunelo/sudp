@@ -129,3 +129,40 @@ func PublicKeyFromPemFile(file string) (*ecdsa.PublicKey, error) {
 	b, e := io.ReadAll(f)
 	return UnmarshalECDSAPublicKey(b)
 }
+
+func GeneratePEMKeyPair(private string, public string) error {
+	pri, e := os.Create(private)
+	if e != nil {
+		return fmt.Errorf("creating private key: %v", e)
+	}
+	defer pri.Close()
+	pub, e := os.Create(public)
+	if e != nil {
+		return fmt.Errorf("creating public key: %v", e)
+	}
+	defer pub.Close()
+
+	pk, err := GenerateKey()
+	if err != nil {
+		return fmt.Errorf("generating private key: %v\n", err)
+	}
+
+	// Serialize the private and public keys
+	prikey, err := MarshalECDSAPrivateKey(pk)
+	if err != nil {
+		return fmt.Errorf("serializing private key: %v\n", err)
+	}
+
+	pubkey, err := MarshalECDSAPublicKey(&pk.PublicKey)
+	if err != nil {
+		return fmt.Errorf("Error serializing public key: %v\n", err)
+	}
+
+	if _, err = pri.Write(prikey); err != nil {
+		return fmt.Errorf("writing private key: %v", err)
+	}
+	if _, err = pub.Write(pubkey); err != nil {
+		return fmt.Errorf("writing public key: %v", err)
+	}
+	return nil
+}

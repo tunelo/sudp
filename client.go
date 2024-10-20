@@ -235,5 +235,8 @@ func (s *ClientConn) Recv() ([]byte, error) {
 		return nil, fmt.Errorf("connection closed")
 	}
 	msg := <-s.ch.userRx
+	if msg == nil {
+		return nil, fmt.Errorf("connection closed")
+	}
 	return msg.buff, nil
 }
