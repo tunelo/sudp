@@ -100,16 +100,16 @@ func (c *ClientConn) serve() error {
 					if tries == 4 {
 						c.open = false
 						c.conn.Close()
-						fmt.Println("estoy fin")
+						//fmt.Println("estoy fin")
 						e := <-c.ch.netRx
-						fmt.Println(e)
+						//fmt.Println(e)
 						for ; e != nil; e = <-c.ch.netRx {
 						}
-						fmt.Println("Pase el for")
+						//fmt.Println("Pase el for")
 						c.ch.close()
-						fmt.Println("Cierro canal")
+						//fmt.Println("Cierro canal")
 						c.err <- fmt.Errorf("timeout")
-						fmt.Println("Retorno")
+						//fmt.Println("Retorno")
 						return
 					}
 					c.server.hsSent = time.Now()
@@ -212,11 +212,19 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr) (*ClientConn, error) {
 	return c, nil
 }
 
-func (s *ClientConn) Close() {
-	if s != nil && s.open {
-		s.ch.exit <- true
-		<-s.err
+func (s *ClientConn) Close() error {
+	var err error
+	if s == nil {
+		return fmt.Errorf("invalid connection")
 	}
+	if s.open {
+		s.ch.exit <- true
+	}
+
+	for e := range s.err {
+		err = fmt.Errorf("%v, %v", err, e)
+	}
+	return err
 }
 
 func (s *ClientConn) Send(buff []byte) error {
