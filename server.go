@@ -72,6 +72,7 @@ func (s *ServerConn) serve() {
 		}
 		for _, peer := range s.peerMap {
 			if peer.ready && time.Now().Sub(peer.ttlm) > 5*time.Second {
+				log(Info, fmt.Sprintf("last activity for %d more than 5 sec ago - close connection", peer.vaddr))
 				peer.epochs.init()
 				peer.naddr = nil
 				peer.ready = false
