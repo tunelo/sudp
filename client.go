@@ -96,20 +96,22 @@ func (c *ClientConn) serve() error {
 					packet.pktSend(c.conn)
 				}
 				if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > 2*time.Second {
+					fmt.Println("Tries: ", tries)
 					tries = tries + 1
 					if tries == 4 {
 						c.open = false
 						c.conn.Close()
-						//fmt.Println("estoy fin")
+						fmt.Println("Purgando canal c.ch.netRx")
 						e := <-c.ch.netRx
-						//fmt.Println(e)
+						fmt.Println("Canal purgado:", e)
 						for ; e != nil; e = <-c.ch.netRx {
+							fmt.Println("For: ", e)
 						}
-						//fmt.Println("Pase el for")
+						fmt.Println("Pase el for")
 						c.ch.close()
-						//fmt.Println("Cierro canal")
+						fmt.Println("Canales Cerrados, enviando timeout")
 						c.err <- fmt.Errorf("timeout")
-						//fmt.Println("Retorno")
+						fmt.Println("Retorno")
 						return
 					}
 					c.server.hsSent = time.Now()
