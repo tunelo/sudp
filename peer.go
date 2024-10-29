@@ -16,7 +16,7 @@ type peer struct {
 	tsync  *timeSync
 	ready  bool
 	hndshk bool
-	resend *pktbuff
+	resend *pkthandshakeraw
 	hsSent time.Time
 }
 

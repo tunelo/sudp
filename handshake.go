@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
+	"time"
 )
 
 const handshakesz = 4 + 65 + 64
@@ -12,6 +13,11 @@ type handshake struct {
 	crc32     uint32
 	pubkey    [65]byte
 	signature [64]byte
+}
+
+type pkthandshakeraw struct {
+	hdr *hdr
+	hsk *handshake
 }
 
 func handshakeLoad(b []byte, v *ecdsa.PublicKey) (*handshake, error) {
@@ -41,4 +47,19 @@ func (h *handshake) dump(b []byte, s *ecdsa.PrivateKey) error {
 	}
 	copy(b[4+65:], h.signature[:])
 	return nil
+}
+
+func (p *pkthandshakeraw) repack(key *ecdsa.PrivateKey) (*pktbuff, error) {
+	packet := allocPktbuff()
+	p.hdr.crc32 = 0
+	p.hdr.time = uint64(time.Now().UnixMilli())
+	if err := p.hdr.dump(packet.tail(hdrsz)); err != nil {
+		return nil, err
+	}
+	p.hsk.signature = [64]byte{}
+	p.hsk.crc32 = p.hdr.crc32
+	if err := p.hsk.dump(packet.tail(handshakesz), key); err != nil {
+		return nil, err
+	}
+	return packet, nil
 }

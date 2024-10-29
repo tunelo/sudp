@@ -27,8 +27,8 @@ func signMessage(privKey *ecdsa.PrivateKey, message []byte) ([64]byte, error) {
 		return signature, err
 	}
 
-	copy(signature[0:32], r.Bytes())
-	copy(signature[32:64], s.Bytes())
+	r.FillBytes(signature[0:32])
+	s.FillBytes(signature[32:64])
 
 	return signature, nil
 }

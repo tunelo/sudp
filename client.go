@@ -115,7 +115,11 @@ func (c *ClientConn) serve() error {
 						return
 					}
 					c.server.hsSent = time.Now()
-					c.server.resend.pktSend(c.conn)
+					rsnd, err := c.server.resend.repack(c.private)
+					if err != nil {
+						rsnd.pktSend(c.conn)
+					}
+
 				}
 			case <-refresh:
 				tries = 0
@@ -143,7 +147,10 @@ func (c *ClientConn) serve() error {
 				}
 				c.server.hndshk = true
 				c.server.hsSent = time.Now()
-				c.server.resend = packet
+				c.server.resend = &pkthandshakeraw{
+					hdr: header,
+					hsk: &handshake,
+				}
 				packet.pktSend(c.conn)
 			}
 			if start && c.server.ready {

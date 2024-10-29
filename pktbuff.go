@@ -79,18 +79,18 @@ func ptkRxRoutine(conn *net.UDPConn, addr *net.UDPAddr) (chan *pktbuff, chan err
 	io := make(chan *pktbuff)
 	er := make(chan error)
 	go func() {
+		defer func() {
+			close(io)
+			close(er)
+		}()
 		for {
 			p, e := pktRecv(conn, addr, nil)
 			if e != nil {
 				if errors.Is(e, net.ErrClosed) {
 					io <- nil
-					close(io)
-					close(er)
 					return
 				}
 				er <- e
-				close(io)
-				close(er)
 				return
 			}
 			io <- p
