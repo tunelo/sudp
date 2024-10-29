@@ -39,8 +39,13 @@ func verifySignature(pubKey *ecdsa.PublicKey, message []byte, signature [64]byte
 	r := new(big.Int).SetBytes(signature[:32])
 	s := new(big.Int).SetBytes(signature[32:])
 
-	valid := ecdsa.Verify(pubKey, hash[:], r, s)
-	return valid
+	if ecdsa.Verify(pubKey, hash[:], r, s) {
+		return true
+	}
+	// Fallback
+	pubKeyCopy := *pubKey
+	pubKeyCopy.Y = new(big.Int).Sub(pubKey.Curve.Params().P, pubKey.Y)
+	return ecdsa.Verify(&pubKeyCopy, hash[:], r, s)
 }
 
 func MarshalECDSAPrivateKey(key *ecdsa.PrivateKey) ([]byte, error) {
