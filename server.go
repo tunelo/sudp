@@ -32,6 +32,7 @@ func (s *ServerConn) filterPacket(pkt *pktbuff) (*hdr, error) {
 }
 
 func (s *ServerConn) serve() {
+	tick := time.NewTicker(time.Second)
 	for {
 		select {
 		case <-s.ch.exit:
@@ -48,7 +49,6 @@ func (s *ServerConn) serve() {
 				continue
 			}
 			peer, _ := s.peerMap[hdr.src]
-			fmt.Println(hdr.String())
 			e = peer.handlePacket(hdr, pkt, s.private, s.ch.userRx, s.conn)
 			if e != nil {
 				log(Error, fmt.Sprintf("at package handle - %v", e))
@@ -69,17 +69,20 @@ func (s *ServerConn) serve() {
 				continue
 			}
 			s.ch.errUTx <- nil
-		}
-		for _, peer := range s.peerMap {
-			if peer.ready && time.Now().Sub(peer.ttlm) > 5*time.Second {
-				log(Info, fmt.Sprintf("last activity for %d more than 5 sec ago - close connection", peer.vaddr))
-				peer.epochs.init()
-				peer.naddr = nil
-				peer.ready = false
-				peer.tsync = nil
-				peer.ttlm = time.Time{}
+
+		case <-tick.C:
+			for _, peer := range s.peerMap {
+				if peer.ready && time.Now().Sub(peer.ttlm) > 5*time.Second {
+					log(Info, fmt.Sprintf("last activity for %d more than 5 sec ago - close connection", peer.vaddr))
+					peer.epochs.init()
+					peer.naddr = nil
+					peer.ready = false
+					peer.tsync = nil
+					peer.ttlm = time.Time{}
+				}
 			}
 		}
+
 	}
 exit:
 	s.open = false
