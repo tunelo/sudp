@@ -2,6 +2,7 @@ package sudp
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"time"
 )
@@ -126,11 +127,16 @@ func (c *ClientConn) serve() error {
 
 				}
 			case <-refresh:
+				var epoch int
 				tries = 0
 				if pending, _ := c.server.epochs.pending(); pending != -1 {
 					continue // Evaluar que hacemos aca
 				}
-				epoch := c.server.epochs.cEpoch + 1
+				if c.server.epochs.cEpoch == -1 {
+					epoch = rand.Intn(65536)
+				} else {
+					epoch = c.server.epochs.cEpoch + 1
+				}
 				key, err := c.server.epochs.new(epoch)
 				if err != nil {
 					continue
