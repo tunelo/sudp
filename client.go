@@ -122,6 +122,7 @@ func (c *ClientConn) serve() error {
 					c.server.hsSent = time.Now()
 					rsnd, err := c.server.resend.repack(c.private)
 					if err == nil {
+						rsnd.addr = c.server.naddr
 						rsnd.pktSend(c.conn)
 					}
 
