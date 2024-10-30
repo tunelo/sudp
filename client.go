@@ -30,6 +30,13 @@ func (c *ClientConn) filterPacket(pkt *pktbuff) (*hdr, error) {
 	return hdr, nil
 }
 
+func (c *ClientConn) RemoteAddress() string {
+	if c != nil {
+		return c.server.naddr.String()
+	}
+	return ""
+}
+
 func (c *ClientConn) serve() error {
 	start := make(chan time.Time)
 	go func(refresh <-chan time.Time) {
