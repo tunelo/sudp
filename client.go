@@ -152,8 +152,8 @@ func (c *ClientConn) serve() error {
 				c.server.hndshk = true
 				c.server.hsSent = time.Now()
 				c.server.resend = &pkthandshakeraw{
-					hdr: header,
-					hsk: &handshake,
+					hdr: *header,
+					hsk: handshake,
 				}
 				packet.pktSend(c.conn)
 			}

@@ -3,6 +3,7 @@ package sudp
 import (
 	"crypto/ecdsa"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"time"
 )
@@ -15,9 +16,18 @@ type handshake struct {
 	signature [64]byte
 }
 
+func (h handshake) String() string {
+	return fmt.Sprintf(
+		"Handshake{\n  CRC32: %08x,\n  PublicKey: %s,\n  Signature: %s\n}",
+		h.crc32,
+		hex.EncodeToString(h.pubkey[:]),
+		hex.EncodeToString(h.signature[:]),
+	)
+}
+
 type pkthandshakeraw struct {
-	hdr *hdr
-	hsk *handshake
+	hdr hdr
+	hsk handshake
 }
 
 func handshakeLoad(b []byte, v *ecdsa.PublicKey) (*handshake, error) {
@@ -61,5 +71,6 @@ func (p *pkthandshakeraw) repack(key *ecdsa.PrivateKey) (*pktbuff, error) {
 	if err := p.hsk.dump(packet.tail(handshakesz), key); err != nil {
 		return nil, err
 	}
+	fmt.Println(p.hdr.String(), p.hsk.String())
 	return packet, nil
 }
