@@ -68,6 +68,7 @@ func (c *ClientConn) serve() error {
 				if pkt == nil {
 					c.open = false
 					c.err <- fmt.Errorf("unexpected close")
+					close(c.err)
 					return
 				}
 				hdr, e := c.filterPacket(pkt)
@@ -83,6 +84,7 @@ func (c *ClientConn) serve() error {
 			case e := <-c.ch.errNRx:
 				c.open = false
 				c.err <- fmt.Errorf("at reception %v -> panic", e)
+				close(c.err)
 				return
 			case <-control.C:
 				if c.server.ready {
@@ -118,6 +120,7 @@ func (c *ClientConn) serve() error {
 						c.ch.close()
 						fmt.Println("Canales Cerrados, enviando timeout")
 						c.err <- fmt.Errorf("timeout")
+						close(c.err)
 						fmt.Println("Retorno")
 						return
 					}
@@ -228,8 +231,15 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr) (*ClientConn, error) {
 	return c, nil
 }
 
-func (s *ClientConn) Close() error {
+func (s *ClientConn) GetErrors() error {
 	var err error
+	for e := range s.err {
+		err = fmt.Errorf("%v, %v", err, e)
+	}
+	return err
+}
+
+func (s *ClientConn) Close() error {
 	if s == nil {
 		return fmt.Errorf("invalid connection")
 	}
@@ -237,10 +247,7 @@ func (s *ClientConn) Close() error {
 		s.ch.exit <- true
 	}
 
-	for e := range s.err {
-		err = fmt.Errorf("%v, %v", err, e)
-	}
-	return err
+	return s.GetErrors()
 }
 
 func (s *ClientConn) Send(buff []byte) error {
