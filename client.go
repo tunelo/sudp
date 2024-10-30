@@ -121,8 +121,7 @@ func (c *ClientConn) serve() error {
 					}
 					c.server.hsSent = time.Now()
 					rsnd, err := c.server.resend.repack(c.private)
-					fmt.Println("Repack: ", err)
-					if err != nil {
+					if err == nil {
 						rsnd.pktSend(c.conn)
 					}
 
