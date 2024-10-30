@@ -265,7 +265,9 @@ func (s *ClientConn) Recv() ([]byte, error) {
 	if s == nil || !s.open {
 		return nil, fmt.Errorf("connection closed")
 	}
+	fmt.Println("Esperando Mensaje")
 	msg := <-s.ch.userRx
+	fmt.Println("Mensaje recibido", msg)
 	if msg == nil {
 		return nil, fmt.Errorf("connection closed")
 	}
