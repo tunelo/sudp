@@ -110,18 +110,12 @@ func (c *ClientConn) serve() error {
 					if tries == 4 {
 						c.open = false
 						c.conn.Close()
-						fmt.Println("Purgando canal c.ch.netRx")
 						e := <-c.ch.netRx
-						fmt.Println("Canal purgado:", e)
 						for ; e != nil; e = <-c.ch.netRx {
-							fmt.Println("For: ", e)
 						}
-						fmt.Println("Pase el for")
 						c.ch.close()
-						fmt.Println("Canales Cerrados, enviando timeout")
 						c.err <- fmt.Errorf("timeout")
 						close(c.err)
-						fmt.Println("Retorno")
 						return
 					}
 					c.server.hsSent = time.Now()
