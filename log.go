@@ -7,8 +7,9 @@ import (
 
 // Definimos constantes para los niveles de log
 const (
-	Info  = "INFO"
-	Error = "ERROR"
+	Info  = "sudp - info"
+	Error = "sudp - error"
+	Warn  = "sudp - warn"
 )
 
 // Función para el log

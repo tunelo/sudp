@@ -9,7 +9,14 @@ import (
 
 type ClientConn struct {
 	server *peer
+	opts   *ClientOpts
 	Conn
+}
+
+type ClientOpts struct {
+	Tries       int
+	TimeRetry   int
+	EpochChange int
 }
 
 func (c *ClientConn) filterPacket(pkt *pktbuff) (*hdr, error) {
@@ -74,12 +81,12 @@ func (c *ClientConn) serve() error {
 				}
 				hdr, e := c.filterPacket(pkt)
 				if e != nil {
-					log(Error, fmt.Sprintf("filter: %v", e))
+					log(Warn, fmt.Sprintf("filter: %v", e))
 					continue
 				}
 				e = c.server.handlePacket(hdr, pkt, c.private, c.ch.userRx, c.conn)
 				if e != nil {
-					log(Error, fmt.Sprintf("at package handle - %v", e))
+					log(Warn, fmt.Sprintf("at package handle - %v", e))
 				}
 
 			case e := <-c.ch.errNRx:
@@ -105,10 +112,9 @@ func (c *ClientConn) serve() error {
 					}
 					packet.pktSend(c.conn)
 				}
-				if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > 2*time.Second {
-					fmt.Println("Tries: ", tries)
+				if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > time.Duration(c.opts.TimeRetry)*time.Second {
 					tries = tries + 1
-					if tries == 4 {
+					if tries == c.opts.Tries+1 {
 						c.open = false
 						c.conn.Close()
 						e := <-c.ch.netRx
@@ -167,7 +173,7 @@ func (c *ClientConn) serve() error {
 			if start && c.server.ready {
 				start = false
 				tries = 0
-				refresh = time.NewTicker(30 * time.Second).C
+				refresh = time.NewTicker(time.Duration(c.opts.EpochChange) * time.Second).C
 				c.err <- nil
 			}
 		}
@@ -195,7 +201,7 @@ func (c *ClientConn) serve() error {
 	return <-c.err
 }
 
-func Connect(laddr *LocalAddr, raddr *RemoteAddr) (*ClientConn, error) {
+func Connect(laddr *LocalAddr, raddr *RemoteAddr, opts *ClientOpts) (*ClientConn, error) {
 
 	if raddr.NetworkAddress == nil {
 		return nil, fmt.Errorf("invalid peer address")
@@ -207,6 +213,14 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr) (*ClientConn, error) {
 	conn, err := net.ListenUDP("udp4", laddr.NetworkAddress)
 	if err != nil {
 		return nil, err
+	}
+
+	if opts == nil {
+		opts = &ClientOpts{
+			TimeRetry:   2,
+			Tries:       4,
+			EpochChange: 30,
+		}
 	}
 
 	c := &ClientConn{
@@ -266,9 +280,7 @@ func (s *ClientConn) Recv() ([]byte, error) {
 	if s == nil || !s.open {
 		return nil, fmt.Errorf("connection closed")
 	}
-	fmt.Println("Esperando Mensaje")
 	msg := <-s.ch.userRx
-	fmt.Println("Mensaje recibido", msg)
 	if msg == nil {
 		return nil, fmt.Errorf("connection closed")
 	}

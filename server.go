@@ -45,13 +45,13 @@ func (s *ServerConn) serve() {
 			}
 			hdr, e := s.filterPacket(pkt)
 			if e != nil {
-				log(Error, fmt.Sprintf("filter: %v", e))
+				log(Warn, fmt.Sprintf("filter: %v", e))
 				continue
 			}
 			peer, _ := s.peerMap[hdr.src]
 			e = peer.handlePacket(hdr, pkt, s.private, s.ch.userRx, s.conn)
 			if e != nil {
-				log(Error, fmt.Sprintf("at package handle - %v", e))
+				log(Warn, fmt.Sprintf("at package handle - %v", e))
 			}
 		case e := <-s.ch.errNRx:
 			s.open = false

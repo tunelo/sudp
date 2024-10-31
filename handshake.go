@@ -71,6 +71,5 @@ func (p *pkthandshakeraw) repack(key *ecdsa.PrivateKey) (*pktbuff, error) {
 	if err := p.hsk.dump(packet.tail(handshakesz), key); err != nil {
 		return nil, err
 	}
-	fmt.Println(p.hdr.String(), p.hsk.String())
 	return packet, nil
 }
