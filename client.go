@@ -222,8 +222,8 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr, opts *ClientOpts) (*ClientConn
 			EpochChange: 30,
 		}
 	}
-
 	c := &ClientConn{
+		opts: opts,
 		Conn: Conn{
 			vaddr:   laddr.VirtualAddress,
 			conn:    conn,
