@@ -20,7 +20,7 @@ type ClientOpts struct {
 }
 
 func (c *ClientConn) filterPacket(pkt *pktbuff) (*hdr, error) {
-	hdr, e := hdrLoad(pkt.head(hdrsz))
+	hdr, e := hdrLoad(pkt.head(hdrsz), c.server.hmackey)
 	if e != nil || hdr.dst != c.vaddr {
 		return nil, newError("invalid header - message drop", e)
 	}
@@ -102,10 +102,10 @@ func (c *ClientConn) serve() error {
 					header.len = ctrlmessagesz
 					packet := allocPktbuff()
 					packet.addr = c.server.naddr
-					if err := header.dump(packet.tail(hdrsz)); err != nil {
+					if err := header.dump(packet.tail(hdrsz), c.server.hmackey); err != nil {
 						continue
 					}
-					ctrl.crc32 = header.crc32
+					ctrl.hmac = header.hmac
 					ctrl.set(KeepAlive)
 					if err := ctrl.dump(packet.tail(ctrlmessagesz), c.private); err != nil {
 						continue
@@ -126,7 +126,7 @@ func (c *ClientConn) serve() error {
 						return
 					}
 					c.server.hsSent = time.Now()
-					rsnd, err := c.server.resend.repack(c.private)
+					rsnd, err := c.server.resend.repack(c.private, c.server.hmackey)
 					if err == nil {
 						rsnd.addr = c.server.naddr
 						rsnd.pktSend(c.conn)
@@ -152,11 +152,11 @@ func (c *ClientConn) serve() error {
 				header.len = handshakesz
 				packet := allocPktbuff()
 				packet.addr = c.server.naddr
-				if err = header.dump(packet.tail(hdrsz)); err != nil {
+				if err = header.dump(packet.tail(hdrsz), c.server.hmackey); err != nil {
 					continue
 				}
 				handshake := handshake{
-					crc32: header.crc32,
+					hmac: header.hmac,
 				}
 				copy(handshake.pubkey[:], key.public())
 				if err = handshake.dump(packet.tail(handshakesz), c.private); err != nil {
