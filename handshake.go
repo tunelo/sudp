@@ -29,6 +29,34 @@ type pkthandshakeraw struct {
 	hsk handshake
 }
 
+type handshakestate struct {
+	tries    int
+	senttime time.Time
+	hdr      hdr
+	msg      handshake
+}
+
+func (h *handshakestate) timeRetry(rtime int) bool {
+	return time.Now().Sub(h.senttime) > time.Duration(rtime)*time.Second
+}
+
+func (h *handshakestate) repack(key *ecdsa.PrivateKey, hmkey []byte) (*pktbuff, error) {
+	packet := allocPktbuff()
+	h.hdr.hmac = [24]byte{}
+	h.hdr.time = uint64(time.Now().UnixMicro())
+	if err := h.hdr.dump(packet.tail(hdrsz), hmkey); err != nil {
+		return nil, err
+	}
+	h.msg.signature = [64]byte{}
+	h.msg.hmac = h.hdr.hmac
+	if err := h.msg.dump(packet.tail(handshakesz), key); err != nil {
+		return nil, err
+	}
+	h.senttime = time.Now()
+	h.tries = h.tries + 1
+	return packet, nil
+}
+
 func handshakeLoad(b []byte, v *ecdsa.PublicKey) (*handshake, error) {
 	if len(b) < handshakesz {
 		return nil, fmt.Errorf("invalid buffer size")

@@ -8,17 +8,18 @@ import (
 )
 
 type peer struct {
-	epochs  epochs
-	pubkey  *ecdsa.PublicKey
-	hmackey []byte
-	naddr   *net.UDPAddr // Net Address
-	vaddr   uint16       // Protocol virtual address
-	ttlm    time.Time    // Time to last message
-	tsync   *timeSync
-	ready   bool
-	hndshk  bool
-	resend  *pkthandshakeraw
-	hsSent  time.Time
+	epochs    epochs
+	pubkey    *ecdsa.PublicKey
+	hmackey   []byte
+	naddr     *net.UDPAddr // Net Address
+	vaddr     uint16       // Protocol virtual address
+	ttlm      time.Time    // Time to last message
+	tsync     *timeSync
+	ready     bool
+	handshake *handshakestate
+	//hndshk  bool
+	//resend  *pkthandshakeraw
+	//hsSent  time.Time
 }
 
 func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, toUser chan *message, conn *net.UDPConn) error {
@@ -84,12 +85,15 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 
 		p.ttlm = time.Now()
 		p.ready = true
-		if p.hndshk == true {
+		/*if p.hndshk == true {
 			p.hndshk = false
 			p.hsSent = time.Time{}
 			p.resend = nil
 		}
-
+		*/
+		if p.handshake != nil {
+			p.handshake = nil
+		}
 		packet := allocPktbuff()
 		packet.addr = p.naddr
 		h := newHdr(typeCtrlMessage, hdr.epoch, hdr.dst, hdr.src)

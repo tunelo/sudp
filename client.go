@@ -51,11 +51,11 @@ func (c *ClientConn) serve() error {
 
 		var (
 			start bool
-			tries int
+			//			tries int
 		)
 
 		start = true
-		tries = 0
+		//		tries = 0
 		control := time.NewTicker(500 * time.Millisecond)
 		for {
 			select {
@@ -112,9 +112,11 @@ func (c *ClientConn) serve() error {
 					}
 					packet.pktSend(c.conn)
 				}
-				if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > time.Duration(c.opts.TimeRetry)*time.Second {
-					tries = tries + 1
-					if tries == c.opts.Tries+1 {
+				if c.server.handshake != nil && c.server.handshake.timeRetry(c.opts.TimeRetry) {
+					//if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > time.Duration(c.opts.TimeRetry)*time.Second {
+					//	tries = tries + 1
+					//if tries == c.opts.Tries+1 {
+					if c.server.handshake.tries == c.opts.Tries {
 						c.open = false
 						c.conn.Close()
 						e := <-c.ch.netRx
@@ -125,8 +127,8 @@ func (c *ClientConn) serve() error {
 						close(c.err)
 						return
 					}
-					c.server.hsSent = time.Now()
-					rsnd, err := c.server.resend.repack(c.private, c.server.hmackey)
+					//	c.server.hsSent = time.Now()
+					rsnd, err := c.server.handshake.repack(c.private, c.server.hmackey)
 					if err == nil {
 						rsnd.addr = c.server.naddr
 						rsnd.pktSend(c.conn)
@@ -135,7 +137,7 @@ func (c *ClientConn) serve() error {
 				}
 			case <-refresh:
 				var epoch int
-				tries = 0
+				//tries = 0
 				if pending, _ := c.server.epochs.pending(); pending != -1 {
 					continue // Evaluar que hacemos aca
 				}
@@ -162,17 +164,23 @@ func (c *ClientConn) serve() error {
 				if err = handshake.dump(packet.tail(handshakesz), c.private); err != nil {
 					continue
 				}
-				c.server.hndshk = true
-				c.server.hsSent = time.Now()
-				c.server.resend = &pkthandshakeraw{
-					hdr: *header,
-					hsk: handshake,
+				//c.server.hndshk = true
+				//c.server.hsSent = time.Now()
+				//c.server.resend = &pkthandshakeraw{
+				//	hdr: *header,
+				//	hsk: handshake,
+				//}
+				c.server.handshake = &handshakestate{
+					tries:    0,
+					senttime: time.Now(),
+					hdr:      *header,
+					msg:      handshake,
 				}
 				packet.pktSend(c.conn)
 			}
 			if start && c.server.ready {
 				start = false
-				tries = 0
+				//tries = 0
 				refresh = time.NewTicker(time.Duration(c.opts.EpochChange) * time.Second).C
 				c.err <- nil
 			}
