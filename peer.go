@@ -26,6 +26,9 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 	case typeClientHandshake:
 		hs, e := handshakeLoad(pkt.head(int(hdr.len)), p.pubkey)
 		if e != nil || hdr.hmac != hs.hmac {
+			if e == nil {
+				e = fmt.Errorf("invalid hmac")
+			}
 			return newError("at client handshake", e)
 		}
 		key, e := p.epochs.new(int(hdr.epoch))

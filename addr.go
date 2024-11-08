@@ -9,6 +9,7 @@ import (
 type RemoteAddr struct {
 	VirtualAddress uint16
 	PublicKey      *ecdsa.PublicKey
+	SharedHmacKey  []byte
 	NetworkAddress *net.UDPAddr
 }
 

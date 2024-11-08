@@ -139,8 +139,9 @@ func Listen(laddr *LocalAddr, raddrs []*RemoteAddr) (*ServerConn, error) {
 			continue
 		}
 		server.peerMap[addr.VirtualAddress] = &peer{
-			vaddr:  addr.VirtualAddress,
-			pubkey: addr.PublicKey,
+			vaddr:   addr.VirtualAddress,
+			pubkey:  addr.PublicKey,
+			hmackey: addr.SharedHmacKey,
 		}
 		server.peerMap[addr.VirtualAddress].epochs.init()
 	}

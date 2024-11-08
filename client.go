@@ -231,9 +231,10 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr, opts *ClientOpts) (*ClientConn
 			err:     make(chan error),
 		},
 		server: &peer{
-			vaddr:  raddr.VirtualAddress,
-			naddr:  raddr.NetworkAddress,
-			pubkey: raddr.PublicKey,
+			vaddr:   raddr.VirtualAddress,
+			naddr:   raddr.NetworkAddress,
+			hmackey: []byte(raddr.SharedHmacKey),
+			pubkey:  raddr.PublicKey,
 		},
 	}
 	c.ch.init(c.conn, c.server.naddr)

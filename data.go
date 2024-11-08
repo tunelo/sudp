@@ -19,8 +19,9 @@ func (d *data) dump(cipher *dhss, dst []byte) error {
 		fmt.Errorf("dst to small to dump data")
 	}
 	// Push data
-	copy(dst[24:], d.buff)
 	copy(dst[0:24], d.hmac[:])
+	copy(dst[24:], d.buff)
+
 	c, e := cipher.encrypt(dst[0 : len(d.buff)+24])
 	if e != nil {
 		return e
