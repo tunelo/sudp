@@ -24,11 +24,6 @@ func (h handshake) String() string {
 	)
 }
 
-type pkthandshakeraw struct {
-	hdr hdr
-	hsk handshake
-}
-
 type handshakestate struct {
 	tries    int
 	senttime time.Time
@@ -84,19 +79,4 @@ func (h *handshake) dump(b []byte, s *ecdsa.PrivateKey) error {
 	}
 	copy(b[24+65:], h.signature[:])
 	return nil
-}
-
-func (p *pkthandshakeraw) repack(key *ecdsa.PrivateKey, hmkey []byte) (*pktbuff, error) {
-	packet := allocPktbuff()
-	p.hdr.hmac = [24]byte{}
-	p.hdr.time = uint64(time.Now().UnixMicro())
-	if err := p.hdr.dump(packet.tail(hdrsz), hmkey); err != nil {
-		return nil, err
-	}
-	p.hsk.signature = [64]byte{}
-	p.hsk.hmac = p.hdr.hmac
-	if err := p.hsk.dump(packet.tail(handshakesz), key); err != nil {
-		return nil, err
-	}
-	return packet, nil
 }
