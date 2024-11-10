@@ -43,7 +43,7 @@ func main() {
 			NetworkAddress: nil,
 		}
 		raddr := sudp.RemoteAddr{
-			SharedHmacKey:  []byte("password"),
+			SharedHmacKey:  nil, //,[]byte("password"),
 			PublicKey:      public,
 			VirtualAddress: 0,
 			NetworkAddress: addr,

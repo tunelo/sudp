@@ -77,15 +77,22 @@ func ParseConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
 	raddr := []*RemoteAddr{}
 
 	for _, peer := range config.Peers {
+		var sharedHmac []byte
 		pubk, e := PublicKeyFromPemFile(peer.PublicKey)
 		if e != nil {
 			return nil, nil, e
 		}
 
+		if peer.SharedHmacKey == "" {
+			sharedHmac = nil
+		} else {
+			sharedHmac = []byte(peer.SharedHmacKey)
+		}
+
 		raddr = append(raddr, &RemoteAddr{
 			VirtualAddress: uint16(peer.VirtualAddress),
 			PublicKey:      pubk,
-			SharedHmacKey:  []byte(peer.SharedHmacKey),
+			SharedHmacKey:  sharedHmac,
 		})
 	}
 
