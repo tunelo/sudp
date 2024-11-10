@@ -1,7 +1,7 @@
 package sudp
 
 const (
-	protocolVersion = 0x2
+	protocolVersion = 0x3
 
 	typeData            = 0x04
 	typeCtrlMessage     = 0x03
