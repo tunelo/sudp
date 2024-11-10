@@ -44,7 +44,7 @@ type Config struct {
 	Peers  []PeerConfig `json:"peers"`
 }
 
-func ParseConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
+func ParseServerConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, nil, err

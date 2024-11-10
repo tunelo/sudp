@@ -12,7 +12,7 @@ func main() {
 	mode := flag.String("mode", "client", "Run in client or server mode")
 	flag.Parse()
 	if *mode == "server" {
-		laddr, raddr, err := sudp.ParseConfig("sudp_config.json")
+		laddr, raddr, err := sudp.ParseServerConfig("sudp_config.json")
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -43,12 +43,13 @@ func main() {
 			NetworkAddress: nil,
 		}
 		raddr := sudp.RemoteAddr{
-			SharedHmacKey:  nil, //,[]byte("password"),
+			SharedHmacKey:  []byte("password"),
 			PublicKey:      public,
 			VirtualAddress: 0,
 			NetworkAddress: addr,
 		}
-
+		fmt.Println(laddr.String())
+		fmt.Println(raddr.String())
 		conn, err := sudp.Connect(&laddr, &raddr, nil)
 		if err != nil {
 			fmt.Println(err)
