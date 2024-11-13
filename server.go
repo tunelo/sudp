@@ -12,13 +12,17 @@ type ServerConn struct {
 }
 
 func (s *ServerConn) filterPacket(pkt *pktbuff) (*hdr, error) {
-	hdr, e := hdrLoad(pkt.head(hdrsz))
-	if e != nil || hdr.dst != s.vaddr {
-		return nil, newError("invalid header - message drop", e)
-	}
-	peer, ok := s.peerMap[hdr.src]
-	if !ok || hdr.dst != s.vaddr {
+	buf := pkt.head(hdrsz)
+	src, dst := hdrSrcDst(buf)
+
+	peer, ok := s.peerMap[src]
+	if !ok || dst != s.vaddr {
 		return nil, newError("invalid source - message drop", nil)
+	}
+
+	hdr, e := hdrLoad(buf, peer.hmackey)
+	if e != nil {
+		return nil, newError("invalid header - message drop", e)
 	}
 
 	if peer.tsync == nil {
@@ -135,8 +139,9 @@ func Listen(laddr *LocalAddr, raddrs []*RemoteAddr) (*ServerConn, error) {
 			continue
 		}
 		server.peerMap[addr.VirtualAddress] = &peer{
-			vaddr:  addr.VirtualAddress,
-			pubkey: addr.PublicKey,
+			vaddr:   addr.VirtualAddress,
+			pubkey:  addr.PublicKey,
+			hmackey: addr.SharedHmacKey,
 		}
 		server.peerMap[addr.VirtualAddress].epochs.init()
 	}

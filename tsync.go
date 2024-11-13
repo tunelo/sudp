@@ -15,7 +15,7 @@ type timeSync struct {
 }
 
 func newTimeSync(remoteTime uint64) (*timeSync, error) {
-	peer := time.UnixMilli(int64(remoteTime))
+	peer := time.UnixMicro(int64(remoteTime))
 	offset := time.Now().Sub(peer)
 
 	if offset.Abs() > offsetTolerance {
@@ -27,7 +27,7 @@ func newTimeSync(remoteTime uint64) (*timeSync, error) {
 }
 
 func (ts *timeSync) inTime(msgTimestamp uint64) bool {
-	sent := time.UnixMilli(int64(msgTimestamp)).Add(ts.offset)
+	sent := time.UnixMicro(int64(msgTimestamp)).Add(ts.offset)
 	host := time.Now()
 	if sent.Before(host.Add(-maxMessageDelay)) { //|| sent.After(host) {
 		return false

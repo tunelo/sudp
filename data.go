@@ -1,17 +1,16 @@
 package sudp
 
 import (
-	"encoding/binary"
 	"fmt"
 )
 
 type data struct {
-	crc32 uint32
-	buff  []byte
+	hmac [24]byte
+	buff []byte
 }
 
 const (
-	dataOverload  = 12 + 16 + 4
+	dataOverload  = 12 + 16 + 24
 	DataHeaderLen = dataOverload
 )
 
@@ -20,9 +19,10 @@ func (d *data) dump(cipher *dhss, dst []byte) error {
 		fmt.Errorf("dst to small to dump data")
 	}
 	// Push data
-	copy(dst[4:], d.buff)
-	binary.BigEndian.PutUint32(dst[0:4], d.crc32)
-	c, e := cipher.encrypt(dst[0 : len(d.buff)+4])
+	copy(dst[0:24], d.hmac[:])
+	copy(dst[24:], d.buff)
+
+	c, e := cipher.encrypt(dst[0 : len(d.buff)+24])
 	if e != nil {
 		return e
 	}
@@ -47,8 +47,8 @@ func loadData(b []byte, cipher *dhss) (*data, error) {
 		return nil, e
 	}
 	data := data{
-		crc32: binary.BigEndian.Uint32(d[0:4]),
-		buff:  d[4:],
+		buff: d[24:],
 	}
+	copy(data.hmac[:], d[0:24])
 	return &data, nil
 }

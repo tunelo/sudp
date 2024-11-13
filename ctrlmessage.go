@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-const ctrlmessagesz = 4 + 4 + 8 + 64
+const ctrlmessagesz = 24 + 4 + 8 + 64
 
 const (
 	KeepAlive    uint32 = 1 << 0 // Bit 0
@@ -16,7 +16,7 @@ const (
 )
 
 type ctrlmessage struct {
-	crc32     uint32
+	hmac      [24]byte
 	ctrl      uint32
 	data      uint64
 	signature [64]byte
@@ -28,13 +28,13 @@ func ctrlmessageLoad(b []byte, v *ecdsa.PublicKey) (*ctrlmessage, error) {
 		return nil, fmt.Errorf("invalid buffer size")
 	}
 	c := ctrlmessage{}
-	copy(c.signature[:], b[16:16+64])
-	if ok := verifySignature(v, b[0:16], c.signature); !ok {
+	copy(c.signature[:], b[36:36+64])
+	if ok := verifySignature(v, b[0:36], c.signature); !ok {
 		return nil, fmt.Errorf("invalid signature")
 	}
-	c.crc32 = binary.BigEndian.Uint32(b[0:4])
-	c.ctrl = binary.BigEndian.Uint32(b[4:8])
-	c.data = binary.BigEndian.Uint64(b[8:16])
+	copy(c.hmac[:], b[0:24])
+	c.ctrl = binary.BigEndian.Uint32(b[24 : 24+4])
+	c.data = binary.BigEndian.Uint64(b[28:36])
 	return &c, nil
 }
 
@@ -51,13 +51,13 @@ func (c *ctrlmessage) dump(b []byte, s *ecdsa.PrivateKey) error {
 	if len(b) < ctrlmessagesz {
 		return fmt.Errorf("invalid buffer size")
 	}
-	binary.BigEndian.PutUint32(b[0:4], c.crc32)
-	binary.BigEndian.PutUint32(b[4:8], c.ctrl)
-	binary.BigEndian.PutUint64(b[8:16], c.data)
-	c.signature, e = signMessage(s, b[0:16])
+	copy(b[0:24], c.hmac[:])
+	binary.BigEndian.PutUint32(b[24:24+4], c.ctrl)
+	binary.BigEndian.PutUint64(b[28:36], c.data)
+	c.signature, e = signMessage(s, b[0:36])
 	if e != nil {
 		return e
 	}
-	copy(b[16:], c.signature[:])
+	copy(b[36:], c.signature[:])
 	return nil
 }

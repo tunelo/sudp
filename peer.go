@@ -8,23 +8,28 @@ import (
 )
 
 type peer struct {
-	epochs epochs
-	pubkey *ecdsa.PublicKey
-	naddr  *net.UDPAddr // Net Address
-	vaddr  uint16       // Protocol virtual address
-	ttlm   time.Time    // Time to last message
-	tsync  *timeSync
-	ready  bool
-	hndshk bool
-	resend *pkthandshakeraw
-	hsSent time.Time
+	epochs    epochs
+	pubkey    *ecdsa.PublicKey
+	hmackey   []byte
+	naddr     *net.UDPAddr // Net Address
+	vaddr     uint16       // Protocol virtual address
+	ttlm      time.Time    // Time to last message
+	tsync     *timeSync
+	ready     bool
+	handshake *handshakestate
+	//hndshk  bool
+	//resend  *pkthandshakeraw
+	//hsSent  time.Time
 }
 
 func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, toUser chan *message, conn *net.UDPConn) error {
 	switch hdr.kind {
 	case typeClientHandshake:
 		hs, e := handshakeLoad(pkt.head(int(hdr.len)), p.pubkey)
-		if e != nil || hdr.crc32 != hs.crc32 {
+		if e != nil || hdr.hmac != hs.hmac {
+			if e == nil {
+				e = fmt.Errorf("invalid hmac")
+			}
 			return newError("at client handshake", e)
 		}
 		key, e := p.epochs.new(int(hdr.epoch))
@@ -44,15 +49,15 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 		packet.addr = p.naddr
 		h := newHdr(typeServerHandshake, hdr.epoch, hdr.dst, hdr.src)
 		h.len = handshakesz
-		if e := h.dump(packet.tail(hdrsz)); e != nil {
+		if e := h.dump(packet.tail(hdrsz), p.hmackey); e != nil {
 			return newError("serializing hdr", e)
 		}
 
 		sh := &handshake{
-			crc32: h.crc32,
+			hmac: h.hmac,
 		}
 		copy(sh.pubkey[:], key.public())
-		sh.crc32 = h.crc32
+		sh.hmac = h.hmac
 		if e := sh.dump(packet.tail(handshakesz), private); e != nil {
 			return newError("serializing server handshake", e)
 		}
@@ -61,7 +66,7 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 
 	case typeServerHandshake:
 		sh, e := handshakeLoad(pkt.head(int(hdr.len)), p.pubkey)
-		if e != nil || hdr.crc32 != sh.crc32 {
+		if e != nil || hdr.hmac != sh.hmac {
 			return newError("at server handshake", e)
 		}
 
@@ -80,21 +85,24 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 
 		p.ttlm = time.Now()
 		p.ready = true
-		if p.hndshk == true {
+		/*if p.hndshk == true {
 			p.hndshk = false
 			p.hsSent = time.Time{}
 			p.resend = nil
 		}
-
+		*/
+		if p.handshake != nil {
+			p.handshake = nil
+		}
 		packet := allocPktbuff()
 		packet.addr = p.naddr
 		h := newHdr(typeCtrlMessage, hdr.epoch, hdr.dst, hdr.src)
 		h.len = ctrlmessagesz
-		if e := h.dump(packet.tail(hdrsz)); e != nil {
+		if e := h.dump(packet.tail(hdrsz), p.hmackey); e != nil {
 			return newError("serializing hdr", e)
 		}
 		ctrl := ctrlmessage{}
-		ctrl.crc32 = h.crc32
+		ctrl.hmac = h.hmac
 		ctrl.set(EpochAck)
 		if e := ctrl.dump(packet.tail(ctrlmessagesz), private); e != nil {
 			return newError("serializing ctrl message", e)
@@ -103,7 +111,7 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 
 	case typeCtrlMessage:
 		c, e := ctrlmessageLoad(pkt.head(int(hdr.len)), p.pubkey)
-		if e != nil || hdr.crc32 != c.crc32 {
+		if e != nil || hdr.hmac != c.hmac {
 			return newError("at ctrl message", e)
 		}
 		if (c.isSet(EpochAck) && p.epochs.isPending(int(hdr.epoch))) || p.epochs.isPending(int(hdr.epoch)) {
@@ -122,11 +130,11 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 			packet.addr = p.naddr
 			header := newHdr(typeCtrlMessage, hdr.epoch, hdr.dst, hdr.src)
 			header.len = ctrlmessagesz
-			if e := header.dump(packet.tail(hdrsz)); e != nil {
+			if e := header.dump(packet.tail(hdrsz), p.hmackey); e != nil {
 				return newError("serializing hdr", e)
 			}
 			ctrl := ctrlmessage{}
-			ctrl.crc32 = header.crc32
+			ctrl.hmac = header.hmac
 			ctrl.set(KeepAliveAck)
 			if e := ctrl.dump(packet.tail(ctrlmessagesz), private); e != nil {
 				return newError("serializing ctrl message", e)
@@ -154,7 +162,7 @@ func (p *peer) handlePacket(hdr *hdr, pkt *pktbuff, private *ecdsa.PrivateKey, t
 			return fmt.Errorf("invalid epoch - drop")
 		}
 		data, e := loadData(pkt.head(int(hdr.len)), key)
-		if e != nil || data.crc32 != hdr.crc32 {
+		if e != nil || data.hmac != hdr.hmac {
 			return newError("at data reception", e)
 		}
 		p.ttlm = time.Now()
@@ -178,11 +186,11 @@ func (p *peer) sendDataPacket(src uint16, buff []byte, conn *net.UDPConn) error 
 	packet.addr = p.naddr
 	hdr := newHdr(typeData, uint32(epoch), src, p.vaddr)
 	hdr.len = uint16(len(buff) + dataOverload)
-	if e := hdr.dump(packet.tail(hdrsz)); e != nil {
+	if e := hdr.dump(packet.tail(hdrsz), p.hmackey); e != nil {
 		return newError("hdr dump", e)
 	}
 	data := data{}
-	data.crc32 = hdr.crc32
+	data.hmac = hdr.hmac
 	data.buff = buff
 	if e := data.dump(key, packet.tail(int(hdr.len))); e != nil {
 		return newError("data dump", e)

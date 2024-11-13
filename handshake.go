@@ -2,32 +2,54 @@ package sudp
 
 import (
 	"crypto/ecdsa"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"time"
 )
 
-const handshakesz = 4 + 65 + 64
+const handshakesz = 24 + 65 + 64
 
 type handshake struct {
-	crc32     uint32
+	hmac      [24]byte
 	pubkey    [65]byte
 	signature [64]byte
 }
 
 func (h handshake) String() string {
 	return fmt.Sprintf(
-		"Handshake{\n  CRC32: %08x,\n  PublicKey: %s,\n  Signature: %s\n}",
-		h.crc32,
+		"Handshake{\n  hmac: %s,\n  PublicKey: %s,\n  Signature: %s\n}",
+		hex.EncodeToString(h.hmac[:]),
 		hex.EncodeToString(h.pubkey[:]),
 		hex.EncodeToString(h.signature[:]),
 	)
 }
 
-type pkthandshakeraw struct {
-	hdr hdr
-	hsk handshake
+type handshakestate struct {
+	tries    int
+	senttime time.Time
+	hdr      hdr
+	msg      handshake
+}
+
+func (h *handshakestate) timeRetry(rtime int) bool {
+	return time.Now().Sub(h.senttime) > time.Duration(rtime)*time.Second
+}
+
+func (h *handshakestate) repack(key *ecdsa.PrivateKey, hmkey []byte) (*pktbuff, error) {
+	packet := allocPktbuff()
+	h.hdr.hmac = [24]byte{}
+	h.hdr.time = uint64(time.Now().UnixMicro())
+	if err := h.hdr.dump(packet.tail(hdrsz), hmkey); err != nil {
+		return nil, err
+	}
+	h.msg.signature = [64]byte{}
+	h.msg.hmac = h.hdr.hmac
+	if err := h.msg.dump(packet.tail(handshakesz), key); err != nil {
+		return nil, err
+	}
+	h.senttime = time.Now()
+	h.tries = h.tries + 1
+	return packet, nil
 }
 
 func handshakeLoad(b []byte, v *ecdsa.PublicKey) (*handshake, error) {
@@ -35,12 +57,12 @@ func handshakeLoad(b []byte, v *ecdsa.PublicKey) (*handshake, error) {
 		return nil, fmt.Errorf("invalid buffer size")
 	}
 	hs := handshake{}
-	copy(hs.signature[:], b[4+65:handshakesz])
-	if ok := verifySignature(v, b[0:4+65], hs.signature); !ok {
+	copy(hs.signature[:], b[24+65:handshakesz])
+	if ok := verifySignature(v, b[0:24+65], hs.signature); !ok {
 		return nil, fmt.Errorf("invalid signature")
 	}
-	hs.crc32 = binary.BigEndian.Uint32(b[0:4])
-	copy(hs.pubkey[:], b[4:4+65])
+	copy(hs.hmac[:], b[0:24])
+	copy(hs.pubkey[:], b[24:24+65])
 	return &hs, nil
 }
 
@@ -49,27 +71,12 @@ func (h *handshake) dump(b []byte, s *ecdsa.PrivateKey) error {
 	if len(b) < handshakesz {
 		return fmt.Errorf("invalid buffer size")
 	}
-	binary.BigEndian.PutUint32(b[0:4], h.crc32)
-	copy(b[4:4+65], h.pubkey[:])
-	h.signature, e = signMessage(s, b[0:4+65])
+	copy(b[0:24], h.hmac[:])
+	copy(b[24:24+65], h.pubkey[:])
+	h.signature, e = signMessage(s, b[0:24+65])
 	if e != nil {
 		return e
 	}
-	copy(b[4+65:], h.signature[:])
+	copy(b[24+65:], h.signature[:])
 	return nil
-}
-
-func (p *pkthandshakeraw) repack(key *ecdsa.PrivateKey) (*pktbuff, error) {
-	packet := allocPktbuff()
-	p.hdr.crc32 = 0
-	p.hdr.time = uint64(time.Now().UnixMilli())
-	if err := p.hdr.dump(packet.tail(hdrsz)); err != nil {
-		return nil, err
-	}
-	p.hsk.signature = [64]byte{}
-	p.hsk.crc32 = p.hdr.crc32
-	if err := p.hsk.dump(packet.tail(handshakesz), key); err != nil {
-		return nil, err
-	}
-	return packet, nil
 }

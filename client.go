@@ -20,7 +20,7 @@ type ClientOpts struct {
 }
 
 func (c *ClientConn) filterPacket(pkt *pktbuff) (*hdr, error) {
-	hdr, e := hdrLoad(pkt.head(hdrsz))
+	hdr, e := hdrLoad(pkt.head(hdrsz), c.server.hmackey)
 	if e != nil || hdr.dst != c.vaddr {
 		return nil, newError("invalid header - message drop", e)
 	}
@@ -51,11 +51,11 @@ func (c *ClientConn) serve() error {
 
 		var (
 			start bool
-			tries int
+			//			tries int
 		)
 
 		start = true
-		tries = 0
+		//		tries = 0
 		control := time.NewTicker(500 * time.Millisecond)
 		for {
 			select {
@@ -102,19 +102,21 @@ func (c *ClientConn) serve() error {
 					header.len = ctrlmessagesz
 					packet := allocPktbuff()
 					packet.addr = c.server.naddr
-					if err := header.dump(packet.tail(hdrsz)); err != nil {
+					if err := header.dump(packet.tail(hdrsz), c.server.hmackey); err != nil {
 						continue
 					}
-					ctrl.crc32 = header.crc32
+					ctrl.hmac = header.hmac
 					ctrl.set(KeepAlive)
 					if err := ctrl.dump(packet.tail(ctrlmessagesz), c.private); err != nil {
 						continue
 					}
 					packet.pktSend(c.conn)
 				}
-				if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > time.Duration(c.opts.TimeRetry)*time.Second {
-					tries = tries + 1
-					if tries == c.opts.Tries+1 {
+				if c.server.handshake != nil && c.server.handshake.timeRetry(c.opts.TimeRetry) {
+					//if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > time.Duration(c.opts.TimeRetry)*time.Second {
+					//	tries = tries + 1
+					//if tries == c.opts.Tries+1 {
+					if c.server.handshake.tries == c.opts.Tries {
 						c.open = false
 						c.conn.Close()
 						e := <-c.ch.netRx
@@ -125,8 +127,8 @@ func (c *ClientConn) serve() error {
 						close(c.err)
 						return
 					}
-					c.server.hsSent = time.Now()
-					rsnd, err := c.server.resend.repack(c.private)
+					//	c.server.hsSent = time.Now()
+					rsnd, err := c.server.handshake.repack(c.private, c.server.hmackey)
 					if err == nil {
 						rsnd.addr = c.server.naddr
 						rsnd.pktSend(c.conn)
@@ -135,7 +137,7 @@ func (c *ClientConn) serve() error {
 				}
 			case <-refresh:
 				var epoch int
-				tries = 0
+				//tries = 0
 				if pending, _ := c.server.epochs.pending(); pending != -1 {
 					continue // Evaluar que hacemos aca
 				}
@@ -152,27 +154,33 @@ func (c *ClientConn) serve() error {
 				header.len = handshakesz
 				packet := allocPktbuff()
 				packet.addr = c.server.naddr
-				if err = header.dump(packet.tail(hdrsz)); err != nil {
+				if err = header.dump(packet.tail(hdrsz), c.server.hmackey); err != nil {
 					continue
 				}
 				handshake := handshake{
-					crc32: header.crc32,
+					hmac: header.hmac,
 				}
 				copy(handshake.pubkey[:], key.public())
 				if err = handshake.dump(packet.tail(handshakesz), c.private); err != nil {
 					continue
 				}
-				c.server.hndshk = true
-				c.server.hsSent = time.Now()
-				c.server.resend = &pkthandshakeraw{
-					hdr: *header,
-					hsk: handshake,
+				//c.server.hndshk = true
+				//c.server.hsSent = time.Now()
+				//c.server.resend = &pkthandshakeraw{
+				//	hdr: *header,
+				//	hsk: handshake,
+				//}
+				c.server.handshake = &handshakestate{
+					tries:    0,
+					senttime: time.Now(),
+					hdr:      *header,
+					msg:      handshake,
 				}
 				packet.pktSend(c.conn)
 			}
 			if start && c.server.ready {
 				start = false
-				tries = 0
+				//tries = 0
 				refresh = time.NewTicker(time.Duration(c.opts.EpochChange) * time.Second).C
 				c.err <- nil
 			}
@@ -231,9 +239,10 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr, opts *ClientOpts) (*ClientConn
 			err:     make(chan error),
 		},
 		server: &peer{
-			vaddr:  raddr.VirtualAddress,
-			naddr:  raddr.NetworkAddress,
-			pubkey: raddr.PublicKey,
+			vaddr:   raddr.VirtualAddress,
+			naddr:   raddr.NetworkAddress,
+			hmackey: []byte(raddr.SharedHmacKey),
+			pubkey:  raddr.PublicKey,
 		},
 	}
 	c.ch.init(c.conn, c.server.naddr)

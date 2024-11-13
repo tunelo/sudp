@@ -19,6 +19,7 @@ Config Example
     "peers": [
 		{
 			"virtual_address": 1001,
+			"hmac_key": "a password",
 			"public_key": "public.pem"
 		}
 	]
@@ -34,6 +35,7 @@ type ServerConfig struct {
 
 type PeerConfig struct {
 	VirtualAddress int    `json:"virtual_address"`
+	SharedHmacKey  string `json:"shared_hmac_key"`
 	PublicKey      string `json:"public_key"`
 }
 
@@ -42,7 +44,7 @@ type Config struct {
 	Peers  []PeerConfig `json:"peers"`
 }
 
-func ParseConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
+func ParseServerConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, nil, err
@@ -75,11 +77,23 @@ func ParseConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
 	raddr := []*RemoteAddr{}
 
 	for _, peer := range config.Peers {
+		var sharedHmac []byte
 		pubk, e := PublicKeyFromPemFile(peer.PublicKey)
 		if e != nil {
 			return nil, nil, e
 		}
-		raddr = append(raddr, &RemoteAddr{VirtualAddress: uint16(peer.VirtualAddress), PublicKey: pubk})
+
+		if peer.SharedHmacKey == "" {
+			sharedHmac = nil
+		} else {
+			sharedHmac = []byte(peer.SharedHmacKey)
+		}
+
+		raddr = append(raddr, &RemoteAddr{
+			VirtualAddress: uint16(peer.VirtualAddress),
+			PublicKey:      pubk,
+			SharedHmacKey:  sharedHmac,
+		})
 	}
 
 	return &laddr, raddr, nil
