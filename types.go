@@ -1,5 +1,7 @@
 package sudp
 
+import "fmt"
+
 const (
 	protocolVersion = 0x3
 
@@ -8,3 +10,11 @@ const (
 	typeServerHandshake = 0x02
 	typeClientHandshake = 0x01
 )
+
+var (
+	libraryVersion = "0.1"
+)
+
+func Version() string {
+	return fmt.Sprintf("protocol: v%d, library: v%s", protocolVersion, libraryVersion)
+}
