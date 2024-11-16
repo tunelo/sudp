@@ -44,20 +44,7 @@ type Config struct {
 	Peers  []PeerConfig `json:"peers"`
 }
 
-func ParseServerConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	config := &Config{}
-	err = decoder.Decode(config)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func (config *Config) ParseAddresses() (*LocalAddr, []*RemoteAddr, error) {
 	addr, e := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", config.Server.Listen, config.Server.Port))
 	if e != nil {
 		return nil, nil, e
@@ -97,4 +84,20 @@ func ParseServerConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
 	}
 
 	return &laddr, raddr, nil
+}
+
+func ParseServerConfig(filePath string) (*LocalAddr, []*RemoteAddr, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	config := &Config{}
+	err = decoder.Decode(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	return config.ParseAddresses()
 }
