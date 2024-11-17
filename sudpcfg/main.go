@@ -145,7 +145,8 @@ func main() {
 	flag.Parse()
 
 	if !add && !new {
-		fmt.Println("command not found: add || new")
+		fmt.Println("error: command not found: add || new")
+		flag.Usage()
 		os.Exit(1)
 	}
 
