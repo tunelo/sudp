@@ -6,7 +6,8 @@ import (
 	"math/rand"
 	"os"
 	"strings"
-	"sudp"
+
+	"github.com/tunelo/sudp"
 )
 
 var (
