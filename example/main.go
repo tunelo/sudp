@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
 	"sudp"
 	"time"
 )
@@ -12,7 +11,18 @@ func main() {
 	mode := flag.String("mode", "client", "Run in client or server mode")
 	flag.Parse()
 	if *mode == "server" {
-		laddr, raddr, err := sudp.ParseServerConfig("sudp_config.json")
+		config, err := sudp.LoadServerConfig("server.json")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		laddr, err := config.LocalAddress()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		raddr, err := config.PeersAddresses()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -32,25 +42,25 @@ func main() {
 			server.SendTo(buff, addr)
 		}
 	} else {
-
-		private, _ := sudp.PrivateFromPemFile("client_private.pem")
-		public, _ := sudp.PublicKeyFromPemFile("server_public.pem")
-
-		addr, _ := net.ResolveUDPAddr("udp4", "127.0.0.1:7000")
-		laddr := sudp.LocalAddr{
-			VirtualAddress: 1001,
-			PrivateKey:     private,
-			NetworkAddress: nil,
+		config, err := sudp.LoadClientConfig("1000_config.json")
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
-		raddr := sudp.RemoteAddr{
-			SharedHmacKey:  []byte("password"),
-			PublicKey:      public,
-			VirtualAddress: 0,
-			NetworkAddress: addr,
+		laddr, err := config.LocalAddress()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		raddr, err := config.ServerAddress()
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
 		fmt.Println(laddr.String())
 		fmt.Println(raddr.String())
-		conn, err := sudp.Connect(&laddr, &raddr, nil)
+		conn, err := sudp.Connect(laddr, raddr, nil)
 		if err != nil {
 			fmt.Println(err)
 			return

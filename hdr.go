@@ -42,7 +42,7 @@ func hdrLoad(b []byte, hmkey []byte) (*hdr, error) {
 	if len(b) < hdrsz {
 		return nil, fmt.Errorf("invalid buffer size")
 	}
-	crc := Blake192Hmac(b, hmkey) //hmac.ChecksumIEEE(b)
+	crc := blake192Hmac(b, hmkey) //hmac.ChecksumIEEE(b)
 	h := &hdr{
 		ver:   b[0],
 		kind:  b[1],
@@ -76,7 +76,7 @@ func (h *hdr) dump(b []byte, hmkey []byte) error {
 	binary.BigEndian.PutUint16(b[6:], h.dst)
 	binary.BigEndian.PutUint32(b[8:], h.epoch)
 	binary.BigEndian.PutUint64(b[12:], h.time)
-	h.hmac = Blake192Hmac(b[:hdrsz], hmkey) //crc32.ChecksumIEEE(b[:hdrsz])
+	h.hmac = blake192Hmac(b[:hdrsz], hmkey) //crc32.ChecksumIEEE(b[:hdrsz])
 	return nil
 }
 
