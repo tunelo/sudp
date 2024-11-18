@@ -12,7 +12,7 @@ const (
 )
 
 var (
-	libraryVersion = "0.2"
+	libraryVersion = "0.2-rc"
 )
 
 func Version() string {
