@@ -4,8 +4,19 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
+)
+
+var (
+	defaultKeyType = "string"
+)
+
+const (
+	charset            = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	AUTOINC            = -1
+	baseVirtualAddress = 1000
 )
 
 type LocalConfig struct {
@@ -119,6 +130,76 @@ func (config *ClientConfig) ServerAddress() (*RemoteAddr, error) {
 		SharedHmacKey:  sharedHmac,
 	}
 	return raddr, nil
+}
+
+func NewServerConfig(private string, public string, port int) (*ServerConfig, error) {
+	prikey, pubkey, err := GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	listen := fmt.Sprintf("%s:%d", private, port)
+	config := ServerConfig{
+		Attributes: &Attributes{
+			PublicIP:   public,
+			ListenPort: &port,
+			PublicKey:  string(pubkey),
+			KeyType:    &defaultKeyType,
+		},
+		Server: LocalConfig{
+			VirtualAddress: 0,
+			NetworkAddress: &listen,
+			KeyType:        &defaultKeyType,
+			PrivateKey:     string(prikey),
+		},
+		Peers: []RemoteConfig{},
+	}
+	return &config, nil
+}
+
+func (config *ServerConfig) AddPeer(vaddr int) (*ClientConfig, error) {
+	cpri, cpub, err := GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	rndstr := func(length int) string {
+		result := make([]byte, length)
+		for i := range result {
+			result[i] = charset[rand.Intn(len(charset))]
+		}
+		return string(result)
+	}
+
+	hmack := rndstr(20)
+
+	if vaddr == AUTOINC {
+		vaddr = len(config.Peers) + baseVirtualAddress
+	}
+
+	config.Peers = append(config.Peers, RemoteConfig{
+		VirtualAddress: vaddr,
+		PublicKey:      string(cpub),
+		SharedHmacKey:  &hmack,
+		KeyType:        &defaultKeyType,
+	})
+
+	listen := fmt.Sprintf("%s:%d", config.Attributes.PublicIP, *config.Attributes.ListenPort)
+	client := ClientConfig{
+		Server: RemoteConfig{
+			VirtualAddress: 0,
+			PublicKey:      config.Attributes.PublicKey,
+			NetworkAddress: &listen,
+			SharedHmacKey:  &hmack,
+			KeyType:        &defaultKeyType,
+		},
+		Host: LocalConfig{
+			VirtualAddress: vaddr,
+			KeyType:        &defaultKeyType,
+			PrivateKey:     string(cpri),
+		},
+	}
+	return &client, nil
 }
 
 func (config *ServerConfig) LocalAddress() (*LocalAddr, error) {
