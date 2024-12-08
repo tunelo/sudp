@@ -2,6 +2,7 @@ package sudp
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"net"
 )
 
@@ -26,8 +27,17 @@ func (c *channels) init(conn *net.UDPConn, addr *net.UDPAddr) {
 func (c *channels) close() {
 	close(c.exit)
 	close(c.userRx)
-	close(c.userTx)
-	close(c.errUTx)
+	select {
+	case _, ok := <-c.userTx:
+		if ok {
+			close(c.userTx)
+			c.errUTx <- fmt.Errorf("Connection close")
+			close(c.errUTx)
+		}
+	default:
+		close(c.userTx)
+		close(c.errUTx)
+	}
 }
 
 type Conn struct {
@@ -36,7 +46,7 @@ type Conn struct {
 	private *ecdsa.PrivateKey
 	ch      channels
 	err     chan error
-	open    bool
+	open    stat
 }
 
 type message struct {

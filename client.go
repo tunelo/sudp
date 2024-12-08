@@ -74,7 +74,7 @@ func (c *ClientConn) serve() error {
 				c.ch.errUTx <- nil
 			case pkt := <-c.ch.netRx:
 				if pkt == nil {
-					c.open = false
+					c.open.setStat(statClose)
 					c.err <- fmt.Errorf("unexpected close")
 					close(c.err)
 					return
@@ -90,7 +90,7 @@ func (c *ClientConn) serve() error {
 				}
 
 			case e := <-c.ch.errNRx:
-				c.open = false
+				c.open.setStat(statClose)
 				c.err <- fmt.Errorf("at reception %v -> panic", e)
 				close(c.err)
 				return
@@ -113,15 +113,13 @@ func (c *ClientConn) serve() error {
 					packet.pktSend(c.conn)
 				}
 				if c.server.handshake != nil && c.server.handshake.timeRetry(c.opts.TimeRetry) {
-					//if c.server.resend != nil && c.server.hndshk && time.Now().Sub(c.server.hsSent) > time.Duration(c.opts.TimeRetry)*time.Second {
-					//	tries = tries + 1
-					//if tries == c.opts.Tries+1 {
 					if c.server.handshake.tries == c.opts.Tries {
-						c.open = false
+						c.open.setStat(statClose)
 						c.conn.Close()
 						e := <-c.ch.netRx
 						for ; e != nil; e = <-c.ch.netRx {
 						}
+
 						c.ch.close()
 						c.err <- fmt.Errorf("timeout")
 						close(c.err)
@@ -186,7 +184,7 @@ func (c *ClientConn) serve() error {
 			}
 		}
 	exit:
-		c.open = false
+		c.open.setStat(statClose)
 		c.conn.Close()
 		for {
 			select {
@@ -251,7 +249,7 @@ func Connect(laddr *LocalAddr, raddr *RemoteAddr, opts *ClientOpts) (*ClientConn
 	if e := c.serve(); e != nil {
 		return nil, e
 	}
-	c.open = true
+	c.open.setStat(statOpen)
 	return c, nil
 }
 
@@ -267,7 +265,7 @@ func (s *ClientConn) Close() error {
 	if s == nil {
 		return fmt.Errorf("invalid connection")
 	}
-	if s.open {
+	if s.open.isOpen() {
 		s.ch.exit <- true
 	}
 
@@ -275,7 +273,7 @@ func (s *ClientConn) Close() error {
 }
 
 func (s *ClientConn) Send(buff []byte) error {
-	if s == nil || !s.open {
+	if s == nil || !s.open.isOpen() {
 		return fmt.Errorf("connection closed")
 	}
 	s.ch.userTx <- &message{
@@ -286,7 +284,7 @@ func (s *ClientConn) Send(buff []byte) error {
 }
 
 func (s *ClientConn) Recv() ([]byte, error) {
-	if s == nil || !s.open {
+	if s == nil || !s.open.isOpen() {
 		return nil, fmt.Errorf("connection closed")
 	}
 	msg := <-s.ch.userRx

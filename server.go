@@ -43,7 +43,7 @@ func (s *ServerConn) serve() {
 			goto exit
 		case pkt := <-s.ch.netRx:
 			if pkt == nil {
-				s.open = false
+				s.open.setStat(statClose)
 				s.err <- fmt.Errorf("unexpected close")
 				return
 			}
@@ -58,7 +58,7 @@ func (s *ServerConn) serve() {
 				log(Warn, fmt.Sprintf("at package handle - %v", e))
 			}
 		case e := <-s.ch.errNRx:
-			s.open = false
+			s.open.setStat(statClose)
 			s.err <- fmt.Errorf("at reception %v -> panic", e)
 			return
 		case msg := <-s.ch.userTx:
@@ -89,7 +89,7 @@ func (s *ServerConn) serve() {
 
 	}
 exit:
-	s.open = false
+	s.open.setStat(statClose)
 	s.conn.Close()
 	for {
 		select {
@@ -147,20 +147,20 @@ func Listen(laddr *LocalAddr, raddrs []*RemoteAddr) (*ServerConn, error) {
 	}
 
 	server.ch.init(conn, nil)
-	server.open = true
+	server.open.setStat(statOpen)
 	go server.serve()
 	return &server, nil
 }
 
 func (s *ServerConn) Close() {
-	if s != nil && s.open {
+	if s != nil && s.open.isOpen() {
 		s.ch.exit <- true
 		<-s.err
 	}
 }
 
 func (s *ServerConn) RecvFrom() ([]byte, uint16, error) {
-	if s == nil || !s.open {
+	if s == nil || !s.open.isOpen() {
 		return nil, 0, fmt.Errorf("server closed")
 	}
 	msg := <-s.ch.userRx
@@ -171,7 +171,7 @@ func (s *ServerConn) RecvFrom() ([]byte, uint16, error) {
 }
 
 func (s *ServerConn) SendTo(buff []byte, addr uint16) error {
-	if s == nil || !s.open {
+	if s == nil || !s.open.isOpen() {
 		return fmt.Errorf("server closed")
 	}
 	s.ch.userTx <- &message{
